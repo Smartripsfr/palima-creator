@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Générateur de facture — Palima Creator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --bg:#F5F4F0;--card:#fff;--accent:#2D2DFF;--accent-light:#EBEBFF;--text:#111;--muted:#888;--border:#E2E2E2;--radius:12px; }
+  body { font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:40px 20px 80px; }
+  .container { max-width:560px;margin:0 auto; }
+  .header { display:flex;align-items:center;justify-content:space-between;margin-bottom:40px; }
+  .logo { font-size:22px;font-weight:600;letter-spacing:-0.5px; }
+  .logo span { display:inline-block;background:var(--accent);color:#fff;padding:2px 8px;border-radius:6px;margin-right:6px;font-size:14px;font-weight:500;vertical-align:middle; }
+  .badge { font-size:12px;color:var(--muted);font-family:'DM Mono',monospace; }
+  .section-label { font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;margin-top:32px; }
+  .section-label:first-of-type { margin-top:0; }
+  .card { background:var(--card);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;margin-bottom:2px; }
+  .field { display:flex;align-items:center;padding:0 16px;min-height:52px;border-bottom:1px solid var(--border);gap:12px;transition:background .15s; }
+  .field:last-child { border-bottom:none; }
+  .field:focus-within { background:var(--accent-light); }
+  .field-label { font-size:13px;color:var(--muted);width:140px;flex-shrink:0; }
+  .field input,.field select { flex:1;border:none;background:transparent;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;color:var(--text);outline:none; }
+  .field input::placeholder { color:#BBBBBB;font-weight:400; }
+  .required { width:5px;height:5px;border-radius:50%;background:var(--accent);flex-shrink:0; }
+  .amount-wrapper { display:flex;align-items:center;flex:1;gap:4px; }
+  .amount-wrapper input { text-align:right; }
+  .currency { font-size:14px;color:var(--muted);font-family:'DM Mono',monospace; }
+  .field-computed { font-family:'DM Mono',monospace;font-size:15px;font-weight:500;color:var(--accent);flex:1;text-align:right; }
+  .info-box { background:var(--accent-light);border-radius:var(--radius);padding:14px 16px;font-size:13px;color:var(--accent);line-height:1.5;margin-bottom:2px; }
+  .info-box strong { font-weight:600; }
+  .btn-download { width:100%;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);padding:18px 24px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-top:32px;display:flex;align-items:center;justify-content:center;gap:10px;transition:all .2s; }
+  .btn-download:hover { background:#1a1aee;transform:translateY(-1px); }
+  .arrow { font-size:18px;transition:transform .2s; }
+  .btn-download:hover .arrow { transform:translateY(2px); }
+  .success-msg { display:none;background:#F0FFF8;border:1px solid #00C472;border-radius:var(--radius);padding:14px 16px;font-size:13px;color:#007A47;margin-top:12px;text-align:center; }
+  .mention-tva { font-size:11px;color:var(--muted);text-align:center;margin-top:20px;font-family:'DM Mono',monospace; }
+  .field.error { background:#FFF5F5; }
+  .field.error .field-label { color:#FF3B30; }
+  @media(max-width:480px){.field-label{width:110px;font-size:12px;}body{padding:24px 16px 60px;}}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="logo"><span>P</span>Palima Creator</div>
+    <div class="badge">Générateur de facture</div>
+  </div>
+
+  <div class="section-label">Tes informations</div>
+  <div class="card">
+    <div class="field" id="f-nom"><span class="field-label">Nom complet</span><input type="text" id="nom" placeholder="Prénom NOM" autocomplete="name"><span class="required"></span></div>
+    <div class="field" id="f-adresse"><span class="field-label">Adresse</span><input type="text" id="adresse" placeholder="12 rue des Voyageurs, 75001 Paris"><span class="required"></span></div>
+    <div class="field" id="f-siret"><span class="field-label">SIRET</span><input type="text" id="siret" placeholder="123 456 789 00010" maxlength="17"><span class="required"></span></div>
+    <div class="field"><span class="field-label">Email</span><input type="email" id="email" placeholder="ton@email.com"></div>
+  </div>
+
+  <div class="section-label">Coordonnées bancaires</div>
+  <div class="card">
+    <div class="field" id="f-iban"><span class="field-label">IBAN</span><input type="text" id="iban" placeholder="FR76 XXXX XXXX XXXX XXXX XXXX XXX"><span class="required"></span></div>
+    <div class="field"><span class="field-label">BIC / SWIFT</span><input type="text" id="bic" placeholder="XXXXXXXX"></div>
+  </div>
+
+  <div class="section-label">Détail de la facture</div>
+  <div class="card">
+    <div class="field"><span class="field-label">N° de facture</span><input type="text" id="num_facture" placeholder="FA-2026-001"></div>
+    <div class="field">
+      <span class="field-label">Mois de prestation</span>
+      <select id="mois">
+        <option value="">— Sélectionner —</option>
+        <option>Janvier 2026</option><option>Février 2026</option><option>Mars 2026</option><option>Avril 2026</option>
+        <option>Mai 2026</option><option>Juin 2026</option><option>Juillet 2026</option><option>Août 2026</option>
+        <option>Septembre 2026</option><option>Octobre 2026</option><option>Novembre 2026</option><option>Décembre 2026</option>
+        <option>Janvier 2027</option><option>Février 2027</option><option>Mars 2027</option><option>Avril 2027</option>
+        <option>Mai 2027</option><option>Juin 2027</option><option>Juillet 2027</option><option>Août 2027</option>
+        <option>Septembre 2027</option><option>Octobre 2027</option><option>Novembre 2027</option><option>Décembre 2027</option>
+      </select>
+    </div>
+    <div class="field" id="f-montant">
+      <span class="field-label">Montant HT</span>
+      <div class="amount-wrapper"><input type="number" id="montant" placeholder="0.00" min="0" step="0.01"><span class="currency">€</span></div>
+      <span class="required"></span>
+    </div>
+    <div class="field"><span class="field-label">Total HT</span><span class="field-computed" id="total-display">—</span></div>
+  </div>
+
+  <div class="info-box"><strong>TVA non applicable</strong> — Tu es en franchise en base de TVA (article 293B du CGI). Cette mention sera automatiquement ajoutée à ta facture.</div>
+
+  <button class="btn-download" id="btn-pdf" onclick="window.generatePDF()">Télécharger ma facture PDF <span class="arrow">↓</span></button>
+  <div class="success-msg" id="success-msg">✓ Facture générée — envoie-la à <strong>facturation@palima.app</strong></div>
+  <p class="mention-tva">TVA non applicable — art. 293B CGI • Délai de paiement : 30 jours</p>
+</div>
+
+<script>
+  // live total — bind after DOM ready
+  window.addEventListener('load', function() {
+    document.getElementById('montant').addEventListener('input', function() {
+      var val = parseFloat(this.value);
+      var d = document.getElementById('total-display');
+      d.textContent = (!isNaN(val) && val > 0) ? val.toFixed(2).replace('.', ',') + ' €' : '—';
+    });
+  });
+
+  function today() {
+    return new Date().toLocaleDateString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric'});
+  }
+
+  function validate() {
+    var fields = [{id:'nom',f:'f-nom'},{id:'adresse',f:'f-adresse'},{id:'siret',f:'f-siret'},{id:'iban',f:'f-iban'},{id:'montant',f:'f-montant'}];
+    var valid = true;
+    fields.forEach(function(item) {
+      var el = document.getElementById(item.id);
+      var fe = document.getElementById(item.f);
+      if (!el.value.trim()) { fe.classList.add('error'); valid = false; }
+      else { fe.classList.remove('error'); }
+    });
+    return valid;
+  }
+
+  function generatePDF() {
+    if (!validate()) return;
+    var jsPDF = window.jspdf.jsPDF;
+    var doc = new jsPDF({unit:'mm',format:'a4'});
+
+    var nom = document.getElementById('nom').value;
+    var adresse = document.getElementById('adresse').value;
+    var siret = document.getElementById('siret').value;
+    var email = document.getElementById('email').value;
+    var iban = document.getElementById('iban').value;
+    var bic = document.getElementById('bic').value;
+    var numFacture = document.getElementById('num_facture').value || 'FA-2026-001';
+    var mois = document.getElementById('mois').value || '—';
+    var montant = parseFloat(document.getElementById('montant').value).toFixed(2);
+
+    var DARK=[17,17,17], ACCENT=[45,45,255], MUTED=[140,140,140], LIGHT=[245,244,240], WHITE=[255,255,255], BORDER=[226,226,226];
+    var W=210, H=297, ML=20, MR=20, CW=170;
+
+    doc.setFillColor(LIGHT[0],LIGHT[1],LIGHT[2]); doc.rect(0,0,W,H,'F');
+    doc.setFillColor(DARK[0],DARK[1],DARK[2]); doc.rect(0,0,W,38,'F');
+    doc.setFillColor(ACCENT[0],ACCENT[1],ACCENT[2]); doc.roundedRect(ML,10,18,18,3,3,'F');
+    doc.setTextColor(WHITE[0],WHITE[1],WHITE[2]); doc.setFontSize(13); doc.setFont('helvetica','bold');
+    doc.text('P',ML+9,22,{align:'center'});
+    doc.setFontSize(18); doc.text('Palima Creator',ML+24,22);
+    doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(180,180,180);
+    doc.text('Programme Créateur',ML+24,28);
+    doc.setFontSize(22); doc.setFont('helvetica','bold'); doc.setTextColor(WHITE[0],WHITE[1],WHITE[2]);
+    doc.text('FACTURE',W-MR,20,{align:'right'});
+    doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(180,180,180);
+    doc.text(numFacture,W-MR,28,{align:'right'});
+    doc.text('Date : '+today(),W-MR,34,{align:'right'});
+
+    var y=52, colW=(CW-8)/2;
+
+    // Émetteur
+    doc.setFillColor(WHITE[0],WHITE[1],WHITE[2]); doc.roundedRect(ML,y,colW,64,4,4,'F');
+    doc.setDrawColor(BORDER[0],BORDER[1],BORDER[2]); doc.setLineWidth(0.3); doc.roundedRect(ML,y,colW,64,4,4,'S');
+    doc.setFillColor(ACCENT[0],ACCENT[1],ACCENT[2]); doc.roundedRect(ML,y,colW,7,4,4,'F'); doc.rect(ML,y+3,colW,4,'F');
+    doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(WHITE[0],WHITE[1],WHITE[2]);
+    doc.text('ÉMETTEUR',ML+5,y+5);
+
+    var ry=y+14;
+    function drawRow(label,val,x,w) {
+      doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(MUTED[0],MUTED[1],MUTED[2]);
+      doc.text(label,x+5,ry);
+      doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(DARK[0],DARK[1],DARK[2]);
+      var lines=doc.splitTextToSize(val,w-10); doc.text(lines[0],x+5,ry+5); ry+=12;
+    }
+    drawRow('Nom',nom,ML,colW); drawRow('Adresse',adresse,ML,colW); drawRow('SIRET',siret,ML,colW);
+    if(email) drawRow('Email',email,ML,colW);
+
+    // Client
+    var cx=ML+colW+8, ry2=y+14;
+    doc.setFillColor(WHITE[0],WHITE[1],WHITE[2]); doc.roundedRect(cx,y,colW,64,4,4,'F');
+    doc.setDrawColor(BORDER[0],BORDER[1],BORDER[2]); doc.roundedRect(cx,y,colW,64,4,4,'S');
+    doc.setFillColor(230,230,255); doc.roundedRect(cx,y,colW,7,4,4,'F'); doc.rect(cx,y+3,colW,4,'F');
+    doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(ACCENT[0],ACCENT[1],ACCENT[2]);
+    doc.text('CLIENT',cx+5,y+5);
+
+    function drawRowClient(label,val) {
+      doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(MUTED[0],MUTED[1],MUTED[2]);
+      doc.text(label,cx+5,ry2);
+      doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(DARK[0],DARK[1],DARK[2]);
+      var lines=doc.splitTextToSize(val,colW-10); doc.text(lines[0],cx+5,ry2+5); ry2+=12;
+    }
+    drawRowClient('Société','SmarTrips SAS');
+    drawRowClient('SIRET','987 832 367 00013');
+    drawRowClient('Adresse','34 Rue du Clos Four, 63100');
+    drawRowClient('TVA','FR61987832367');
+
+    y+=74;
+
+    // Prestation
+    doc.setFillColor(ACCENT[0],ACCENT[1],ACCENT[2]); doc.roundedRect(ML,y,CW,8,2,2,'F');
+    doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(WHITE[0],WHITE[1],WHITE[2]);
+    doc.text('DESCRIPTION',ML+5,y+5.5);
+    doc.text('MOIS',ML+CW*0.62,y+5.5);
+    doc.text('MONTANT HT',W-MR-5,y+5.5,{align:'right'});
+    y+=8;
+    doc.setFillColor(WHITE[0],WHITE[1],WHITE[2]); doc.rect(ML,y,CW,16,'F');
+    doc.setDrawColor(BORDER[0],BORDER[1],BORDER[2]); doc.setLineWidth(0.3); doc.rect(ML,y,CW,16,'S');
+    doc.setFontSize(9.5); doc.setFont('helvetica','bold'); doc.setTextColor(DARK[0],DARK[1],DARK[2]);
+    doc.text('Création de contenu vidéo — Programme Palima Creator',ML+5,y+7);
+    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(MUTED[0],MUTED[1],MUTED[2]);
+    doc.text('Contenu TikTok court format depuis compte secondaire',ML+5,y+12);
+    doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(DARK[0],DARK[1],DARK[2]);
+    doc.text(mois,ML+CW*0.62,y+9);
+    doc.setFont('helvetica','bold');
+    doc.text(montant+' \u20ac',W-MR-5,y+9,{align:'right'});
+    y+=16;
+
+    // Total
+    doc.setFillColor(230,230,255); doc.roundedRect(ML+CW*0.55,y,CW*0.45,14,3,3,'F');
+    doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(MUTED[0],MUTED[1],MUTED[2]);
+    doc.text('TOTAL HT',ML+CW*0.57,y+6);
+    doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(ACCENT[0],ACCENT[1],ACCENT[2]);
+    doc.text(montant+' \u20ac',W-MR-5,y+10,{align:'right'});
+    y+=24;
+
+    // TVA
+    doc.setFillColor(245,245,255); doc.roundedRect(ML,y,CW,10,3,3,'F');
+    doc.setFontSize(8); doc.setFont('helvetica','italic'); doc.setTextColor(MUTED[0],MUTED[1],MUTED[2]);
+    doc.text('TVA non applicable, article 293B du CGI',ML+CW/2,y+6.5,{align:'center'});
+    y+=20;
+
+    // Banque
+    doc.setFillColor(DARK[0],DARK[1],DARK[2]); doc.roundedRect(ML,y,CW,8,2,2,'F');
+    doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(WHITE[0],WHITE[1],WHITE[2]);
+    doc.text('COORDONNÉES BANCAIRES',ML+5,y+5.5);
+    y+=8;
+    doc.setFillColor(WHITE[0],WHITE[1],WHITE[2]); doc.roundedRect(ML,y,CW,22,0,0,'F');
+    doc.setDrawColor(BORDER[0],BORDER[1],BORDER[2]); doc.rect(ML,y,CW,22,'S');
+    [['Titulaire',nom],['IBAN',iban],['BIC / SWIFT',bic||'—']].forEach(function(row,i){
+      var by=y+7+i*6;
+      doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(MUTED[0],MUTED[1],MUTED[2]);
+      doc.text(row[0],ML+5,by);
+      doc.setFont('helvetica','bold'); doc.setTextColor(DARK[0],DARK[1],DARK[2]);
+      doc.text(row[1],ML+40,by);
+    });
+    y+=32;
+
+    // Footer
+    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(MUTED[0],MUTED[1],MUTED[2]);
+    doc.text('Délai de paiement : 30 jours après réception de la facture',ML,y);
+    doc.text('Envoie cette facture à : facturation@palima.app',ML,y+6);
+
+    doc.setFillColor(DARK[0],DARK[1],DARK[2]); doc.rect(0,H-12,W,12,'F');
+    doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(140,140,140);
+    doc.text('Palima Creator Program • SmarTrips SAS',W/2,H-5.5,{align:'center'});
+
+    doc.save('Facture_Palima_'+nom.replace(/\s/g,'_')+'_'+mois.replace(/\s/g,'_')+'.pdf');
+
+    var msg=document.getElementById('success-msg');
+    msg.style.display='block';
+    setTimeout(function(){msg.style.display='none';},4000);
+  }
+
+  window.generatePDF = generatePDF;
+</script>
+</body>
+</html>
